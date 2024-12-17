@@ -1,0 +1,10 @@
+class FilterOperator:
+    IS = "is"
+    IS_NOT = "is_not"
+    CONTAINS = "contains"
+    NOT_CONTAINS = "not_contains"
+    GREATER_THAN = "greater_than"
+    LESS_THAN = "less_than"
+    IN = "in"
+    NOT_IN = "not_in"
+    BETWEEN = "between"
