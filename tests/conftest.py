@@ -2,16 +2,16 @@ import os
 
 import pytest
 
-from shotgrid_client.config import ShotgridSettings
+from flowptr_client.config import FlowPTRClientSettings
 
 
 @pytest.fixture
 def test_settings():
-    return ShotgridSettings(
-        client_id="test_client",
-        client_secret="test_secret",
-        domain="https://test.shotgunstudio.com/",
-        api_version="api/v1",
+    return FlowPTRClientSettings(
+        CLIENT_ID="test_client",
+        CLIENT_SECRET="test_secret",
+        DOMAIN="https://test.shotgunstudio.com/",
+        API_VERSION="api/v1",
     )
 
 
