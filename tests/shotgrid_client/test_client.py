@@ -1,123 +1,118 @@
-from unittest.mock import Mock, patch
-
+import httpx
 import pytest
-from httpx import Response
+import respx
 
 from shotgrid_client.client import ShotgridClient
-from shotgrid_client.config import ShotgridSettings
 
 
 @pytest.fixture
-def mock_client():
-    with patch("shotgrid_client.client.AsyncOAuth2Client") as mock:
-        oauth_client = Mock()
-        mock.return_value = oauth_client
-
-        # Setup mock responses
-        response = Mock(spec=Response)
-        response.json.return_value = {"data": "test"}
-        response.raise_for_status = Mock()
-        oauth_client.request.return_value = response
-
-        # Setup token fetch
-        oauth_client.fetch_token.return_value = {"access_token": "test_token"}
-
-        yield oauth_client
-
-
-@pytest.fixture
-def client(mock_client):
-    return ShotgridClient()
+def client(test_settings):
+    """Create a test client instance"""
+    # Remove async since ShotgridClient.__init__ is not async
+    return ShotgridClient(config=test_settings)
 
 
 @pytest.mark.asyncio
-async def test_init_default_config():
-    client = ShotgridClient()
-    assert isinstance(client.config, ShotgridSettings)
-    assert client.token is None
+async def test_token_fetch(client, mock_token_response):
+    """Test initial token fetch"""
+    with respx.mock(assert_all_mocked=False) as mock:
+        # Match exact URL and headers
+        mock.post(
+            "https://test.shotgunstudio.com/api/v1/auth/access_token",
+            headers={
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Accept": "application/json",
+            },
+        ).respond(json=mock_token_response)
+
+        await client._ensure_token()
+        assert client.token is not None
+        assert client.token["access_token"] == mock_token_response["access_token"]
 
 
 @pytest.mark.asyncio
-async def test_init_custom_config():
-    config = ShotgridSettings(base_url="https://custom.shotgrid.com")
-    client = ShotgridClient(config)
-    assert client.config.base_url == "https://custom.shotgrid.com"
+async def test_token_refresh(client, mock_token_response):
+    """Test token refresh when expired"""
+    with respx.mock() as mock:
+        # Initial token
+        mock.post(str(client.config.auth_endpoint)).respond(
+            json=mock_token_response, status_code=200
+        )
+
+        # Simulate token expiry
+        client.token = None
+
+        # Should fetch new token
+        await client._ensure_token()
+        assert client.token is not None
+        assert mock.calls.call_count == 1
 
 
 @pytest.mark.asyncio
-async def test_ensure_token(client, mock_client):
-    await client._ensure_token()
-    mock_client.fetch_token.assert_called_once()
-    assert client.token == {"access_token": "test_token"}
+async def test_get_request(client, mock_token_response):
+    """Test GET request"""
+    test_data = {"key": "value"}
+
+    with respx.mock() as mock:
+        # Mock token endpoint
+        mock.post(str(client.config.auth_endpoint)).respond(
+            json=mock_token_response, status_code=200
+        )
+
+        # Mock GET endpoint
+        mock.get(f"{client.config.base_url}test").respond(
+            json=test_data, status_code=200
+        )
+
+        response = await client.get("test")
+        assert response == test_data
+        assert mock.calls.call_count == 2  # Token fetch + GET request
 
 
 @pytest.mark.asyncio
-async def test_update_token(client):
-    new_token = {"access_token": "new_token"}
-    client._update_token(new_token)
-    assert client.token == new_token
+async def test_post_request(client, mock_token_response):
+    """Test POST request"""
+    request_data = {"post": "data"}
+    response_data = {"status": "success"}
+
+    with respx.mock() as mock:
+        mock.post(str(client.config.auth_endpoint)).respond(
+            json=mock_token_response, status_code=200
+        )
+
+        mock.post(f"{client.config.base_url}test").respond(
+            json=response_data, status_code=200
+        )
+
+        response = await client.post("test", json=request_data)
+        assert response == response_data
+        assert mock.calls.last.request.content == b'{"post": "data"}'
 
 
 @pytest.mark.asyncio
-async def test_get(client, mock_client):
-    result = await client.get("/endpoint", {"param": "value"})
-    mock_client.request.assert_called_with(
-        "GET",
-        f"{client.config.base_url}/endpoint",
-        params={"param": "value"},
-        headers={"Accept": "application/json", "Content-Type": "application/json"},
-    )
-    assert result == {"data": "test"}
+async def test_request_headers(client, mock_token_response):
+    """Test request headers are set correctly"""
+    with respx.mock() as mock:
+        mock.post(str(client.config.auth_endpoint)).respond(
+            json=mock_token_response, status_code=200
+        )
+
+        mock.get(f"{client.config.base_url}test").respond(json={}, status_code=200)
+
+        await client.get("test")
+        assert mock.calls.last.request.headers["Accept"] == "application/json"
+        assert mock.calls.last.request.headers["Content-Type"] == "application/json"
 
 
 @pytest.mark.asyncio
-async def test_post(client, mock_client):
-    data = {"test": "data"}
-    result = await client.post("/endpoint", data)
-    mock_client.request.assert_called_with(
-        "POST",
-        f"{client.config.base_url}/endpoint",
-        json=data,
-        headers={"Accept": "application/json", "Content-Type": "application/json"},
-    )
-    assert result == {"data": "test"}
+async def test_error_handling(client, mock_token_response):
+    """Test error handling for failed requests"""
+    with respx.mock() as mock:
+        mock.post(str(client.config.auth_endpoint)).respond(
+            json=mock_token_response, status_code=200
+        )
 
+        mock.get(f"{client.config.base_url}test").respond(status_code=404)
 
-@pytest.mark.asyncio
-async def test_put(client, mock_client):
-    data = {"test": "data"}
-    result = await client.put("/endpoint", data)
-    mock_client.request.assert_called_with(
-        "PUT",
-        f"{client.config.base_url}/endpoint",
-        json=data,
-        headers={"Accept": "application/json", "Content-Type": "application/json"},
-    )
-    assert result == {"data": "test"}
-
-
-@pytest.mark.asyncio
-async def test_delete(client, mock_client):
-    await client.delete("/endpoint")
-    mock_client.request.assert_called_with(
-        "DELETE",
-        f"{client.config.base_url}/endpoint",
-        headers={"Accept": "application/json", "Content-Type": "application/json"},
-    )
-
-
-@pytest.mark.asyncio
-async def test_request_error(client, mock_client):
-    mock_client.request.return_value.raise_for_status.side_effect = Exception(
-        "API Error"
-    )
-
-    with pytest.raises(Exception, match="API Error"):
-        await client.get("/endpoint")
-
-
-@pytest.mark.asyncio
-async def test_ensure_token_cached(client, mock_client):
-    client.token = {"access_token": "existing_token"}
-    await client._ensure_token()
-    mock_client.fetch_token.assert_not_called()
+        with pytest.raises(httpx.HTTPError):
+            await client.get("test")

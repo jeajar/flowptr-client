@@ -12,3 +12,6 @@ wheels/
 
 # API specs saved by the user
 specs.json
+
+# MacOS
+.DS_Store
