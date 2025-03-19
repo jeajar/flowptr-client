@@ -10,6 +10,7 @@ dependencies = [
     "pydantic>=2.10.3",
     "pydantic-settings>=2.7.0",
     "rich>=13.9.4",
+    "openapi-python-client>=0.24.1",
 ]
 
 # Define where the package is located

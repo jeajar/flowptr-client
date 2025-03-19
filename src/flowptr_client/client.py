@@ -3,10 +3,11 @@ from typing import Any, Optional
 import httpx
 from authlib.integrations.httpx_client import AsyncOAuth2Client
 
+from flowptr_client.application.interfaces import FlowPTRClientInterface
 from flowptr_client.config import FlowPTRClientSettings
 
 
-class FlowPTRClient:
+class FlowPTRClient(FlowPTRClientInterface):
     def __init__(self, config: FlowPTRClientSettings = FlowPTRClientSettings()):
         self.config = config
         self.token = None

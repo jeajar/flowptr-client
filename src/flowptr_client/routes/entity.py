@@ -1,137 +1,104 @@
-from dataclasses import dataclass
-from typing import Any, Generic, Optional, TypedDict, TypeVar
+from collections.abc import Sequence
+from typing import Any, Generic, Optional, TypeVar, Union
+
+from flowptr_client.application.interfaces import FlowPTRClientInterface
+
+from ..domain.value_objects.filter import ComplexFilter, FilterCondition
+from ..domain.value_objects.pagination import PageParams
 
 T = TypeVar("T")
 
 
-@dataclass
-class PageParams:
-    size: int
-    number: Optional[int] = None
-
-
-class EntityData(TypedDict):
-    id: int
-    type: str
-    attributes: dict[str, Any]
-    relationships: dict[str, Any]
-
-
 class EntityRoute(Generic[T]):
-    """Base entity route implementation for ShotGrid/Flow REST API"""
+    """Base entity route implementation for Flow PT REST API."""
 
     base_route: str = "/entity/"
 
-    def __init__(self, client, entity_type: str):
+    def __init__(self, client: FlowPTRClientInterface):
         self.client = client
-        self.entity_type = entity_type
 
     async def get(
         self,
-        filters: Optional[dict[str, Any]] = None,
-        fields: Optional[list[str]] = None,
-        sort: Optional[list[str]] = None,
+        entity: str,
+        filters: Optional[Sequence[FilterCondition]] = None,
+        fields: Optional[Sequence[str]] = None,
+        sort: Optional[Sequence[str]] = None,
         page: Optional[PageParams] = None,
     ) -> dict[str, Any]:
-        """Get entities matching criteria"""
+        """Get entities matching criteria using array-style filters."""
         params = self._build_params(filters, fields, sort, page)
-        return await self.client.get(
-            f"{self.base_route}{self.entity_type}", params=params
-        )
-
-    async def get_by_id(
-        self, entity_id: int, fields: Optional[list[str]] = None
-    ) -> EntityData:
-        """Get single entity by ID"""
-        params = self._build_params(fields=fields)
-        return await self.client.get(
-            f"{self.base_route}{self.entity_type}/{entity_id}", params=params
-        )
+        return await self.client.get(f"{self.base_route}{entity}", params=params)
 
     async def search(
         self,
-        filters: dict[str, Any],
-        fields: Optional[list[str]] = None,
-        sort: Optional[list[str]] = None,
+        entity: str,
+        filters: Union[Sequence[FilterCondition], ComplexFilter],
+        fields: Optional[Sequence[str]] = None,
+        sort: Optional[Sequence[str]] = None,
         page: Optional[PageParams] = None,
     ) -> dict[str, Any]:
-        """Search entities with complex filters"""
+        """Search entities with complex filters."""
         params = self._build_params(fields=fields, sort=sort, page=page)
+
+        # Convert filters to Flow PT format
+        if isinstance(filters, ComplexFilter):
+            # Hash style format
+            filter_data = {
+                "filters": {
+                    "logical_operator": filters.logical_operator,
+                    "conditions": [
+                        self._convert_filter_condition(c)
+                        if isinstance(c, FilterCondition)
+                        else self._convert_complex_filter(c)
+                        for c in filters.conditions
+                    ],
+                }
+            }
+            headers = {"Content-Type": "application/vnd+shotgun.api3_hash+json"}
+        else:
+            # Array style format
+            filter_data = {
+                "filters": [self._convert_filter_condition(f) for f in filters]
+            }
+            headers = {"Content-Type": "application/vnd+shotgun.api3_array+json"}
+
         return await self.client.post(
-            f"{self.base_route}{self.entity_type}/_search",
-            json={"filters": filters},
+            f"{self.base_route}{entity}/_search",
+            json=filter_data,
             params=params,
+            headers=headers,
         )
 
-    async def summarize(
-        self,
-        filters: dict[str, Any],
-        summary_fields: list[str],
-        grouping: Optional[list[str]] = None,
-    ) -> dict[str, Any]:
-        """Get summary of entity fields with optional grouping"""
-        data = {"filters": filters, "summary_fields": summary_fields}
-        if grouping:
-            data["grouping"] = grouping
-        return await self.client.post(
-            f"{self.base_route}{self.entity_type}/_summarize", json=data
-        )
+    def _convert_filter_condition(self, condition: FilterCondition) -> list:
+        """Convert FilterCondition to Flow PT format."""
+        return [condition.field, condition.relation, condition.value]
 
-    async def create(self, data: dict[str, Any]) -> dict[str, Any]:
-        """Create new entity"""
-        return await self.client.post(f"{self.base_route}{self.entity_type}", json=data)
-
-    async def update(self, entity_id: int, data: dict[str, Any]) -> dict[str, Any]:
-        """Update existing entity"""
-        return await self.client.put(
-            f"{self.base_route}{self.entity_type}/{entity_id}", json=data
-        )
-
-    async def delete(self, entity_id: int) -> None:
-        """Delete entity"""
-        await self.client.delete(f"{self.base_route}{self.entity_type}/{entity_id}")
-
-    async def revive(self, entity_id: int) -> dict[str, Any]:
-        """Revive deleted entity"""
-        return await self.client.put(
-            f"{self.base_route}{self.entity_type}/{entity_id}/revive"
-        )
-
-    async def get_related(
-        self, entity_id: int, relation: str, fields: Optional[list[str]] = None
-    ) -> dict[str, Any]:
-        """Get related entities"""
-        params = self._build_params(fields=fields)
-        return await self.client.get(
-            f"{self.base_route}{self.entity_type}/{entity_id}/{relation}", params=params
-        )
-
-    async def activity_stream(
-        self, entity_id: int, limit: Optional[int] = None, cursor: Optional[str] = None
-    ) -> dict[str, Any]:
-        """Get activity stream for an entity"""
-        params = {}
-        if limit:
-            params["limit"] = limit
-        if cursor:
-            params["cursor"] = cursor
-        return await self.client.get(
-            f"{self.base_route}{self.entity_type}/{entity_id}/activity_stream",
-            params=params,
-        )
+    def _convert_complex_filter(self, filter_: ComplexFilter) -> dict:
+        """Convert ComplexFilter to Flow PT format."""
+        return {
+            "logical_operator": filter_.logical_operator,
+            "conditions": [
+                self._convert_filter_condition(c)
+                if isinstance(c, FilterCondition)
+                else self._convert_complex_filter(c)
+                for c in filter_.conditions
+            ],
+        }
 
     def _build_params(
         self,
-        filters: Optional[dict[str, Any]] = None,
-        fields: Optional[list[str]] = None,
-        sort: Optional[list[str]] = None,
+        filters: Optional[Sequence[FilterCondition]] = None,
+        fields: Optional[Sequence[str]] = None,
+        sort: Optional[Sequence[str]] = None,
         page: Optional[PageParams] = None,
     ) -> dict[str, Any]:
-        """Build query parameters"""
+        """Build query parameters according to Flow PT specs."""
         params: dict[str, Any] = {}
 
         if filters:
-            params.update({f"filter[{k}]": v for k, v in filters.items()})
+            # Convert simple filters to query params format
+            for condition in filters:
+                params[f"filter[{condition.field}]"] = condition.value
 
         if fields:
             params["fields"] = ",".join(fields)
