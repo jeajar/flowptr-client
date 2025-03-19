@@ -1,4 +1,4 @@
-# Shotgrid REST API Client
+# FlowPTR REST API Client
 
 [![Python](https://img.shields.io/badge/python-3.9%20%7C%203.10%20%7C%203.11-blue)](https://www.python.org/downloads/)
 
