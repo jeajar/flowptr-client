@@ -11,9 +11,6 @@ class InfoRoute(BaseRoute):
 
     base_route = "/"  # Root route for info.
 
-    def __init__(self, client):
-        self.client = client
-
     async def get_spec(self) -> dict[str, Any]:
         """Get Shotgrid API spec"""
         return await self.client.get(f"{self.base_route}spec.json")

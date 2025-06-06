@@ -1,21 +1,17 @@
 from collections.abc import Sequence
 from typing import Any, Generic, Optional, TypeVar, Union
 
-from flowptr_client.application.interfaces import FlowPTRClientInterface
-
-from ..domain.value_objects.filter import ComplexFilter, FilterCondition
-from ..domain.value_objects.pagination import PageParams
+from ..models.filter import ComplexFilter, FilterCondition
+from ..models.pagination import PageParams
+from .base import BaseRoute
 
 T = TypeVar("T")
 
 
-class EntityRoute(Generic[T]):
+class EntityRoute(BaseRoute, Generic[T]):
     """Base entity route implementation for Flow PT REST API."""
 
     base_route: str = "/entity/"
-
-    def __init__(self, client: FlowPTRClientInterface):
-        self.client = client
 
     async def get(
         self,

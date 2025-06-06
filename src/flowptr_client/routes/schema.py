@@ -6,9 +6,6 @@ class SchemaRoute:
 
     base_route: str = "/schema/"
 
-    def __init__(self, client):
-        self.client = client
-
     async def get_entity(
         self, entity_type: str, project_id: Optional[int] = None
     ) -> dict[str, Any]:

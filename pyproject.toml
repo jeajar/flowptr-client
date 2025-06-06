@@ -51,6 +51,7 @@ select = [
     "C4",  # flake8-comprehensions
     "UP",  # pyupgrade
     "ARG", # unused arguments in functions
+    "ANN", # type annotations
 ]
 ignore = [
     "B008",  # do not perform function calls in argument defaults
