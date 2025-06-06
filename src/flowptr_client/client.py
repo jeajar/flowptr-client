@@ -3,17 +3,16 @@ from typing import Any, Optional
 import httpx
 from authlib.integrations.httpx_client import AsyncOAuth2Client
 
-from flowptr_client.application.interfaces import FlowPTRClientInterface
-from flowptr_client.config import FlowPTRClientSettings
+from flowptr_client.config import FlowPTRSettings
 
 
-class FlowPTRClient(FlowPTRClientInterface):
-    def __init__(self, config: FlowPTRClientSettings = FlowPTRClientSettings()):
+class FlowPTClient:
+    def __init__(self, config: FlowPTRSettings = FlowPTRSettings()):
         self.config = config
         self.token = None
         self.client = AsyncOAuth2Client(
-            client_id=config.CLIENT_ID,
-            client_secret=config.CLIENT_SECRET,
+            client_id=config.client_id,
+            client_secret=config.client_secret,
             token_endpoint=str(config.auth_endpoint),
             grant_type="client_credentials",
             update_token=self._update_token,
@@ -42,12 +41,13 @@ class FlowPTRClient(FlowPTRClientInterface):
 
         # Ensure headers are set
         kwargs.setdefault("headers", {})
-        kwargs["headers"].update(
-            {
-                "Accept": "application/json",
-                "Content-Type": "application/json",
-            }
-        )
+        if not kwargs["headers"]:
+            kwargs["headers"].update(
+                {
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                }
+            )
 
         url = f"{self.config.base_url}{endpoint}"
         response = await self.client.request(method, url, **kwargs)
@@ -61,9 +61,17 @@ class FlowPTRClient(FlowPTRClientInterface):
         response = await self._request("GET", endpoint, params=params)
         return response.json()
 
-    async def post(self, endpoint: str, json: dict[str, Any]) -> dict[str, Any]:
+    async def post(
+        self,
+        endpoint: str,
+        json: dict[str, Any],
+        params: Optional[dict[str, Any]] = None,
+        headers: Optional[dict[str, str]] = None,
+    ) -> dict[str, Any]:
         """Make POST request"""
-        response = await self._request("POST", endpoint, json=json)
+        response = await self._request(
+            "POST", endpoint, params=params, json=json, headers=headers
+        )
         return response.json()
 
     async def put(self, endpoint: str, json: dict[str, Any]) -> dict[str, Any]:

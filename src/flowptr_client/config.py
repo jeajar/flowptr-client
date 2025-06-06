@@ -2,7 +2,7 @@ from pydantic import Field, HttpUrl, computed_field
 from pydantic_settings import BaseSettings
 
 
-class FlowPTRClientSettings(BaseSettings):
+class FlowPTRSettings(BaseSettings):
     """FlowPTR API configuration settings"""
 
     CLIENT_ID: str = Field(..., description="Script Name")
@@ -39,6 +39,6 @@ class FlowPTRClientSettings(BaseSettings):
 if __name__ == "__main__":
     from rich import print
 
-    config = FlowPTRClientSettings()
+    config = FlowPTRSettings()
     print(config)
     pass

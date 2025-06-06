@@ -1,14 +1,12 @@
 from typing import Any, Optional
 
-from flowptr_client.application.interfaces import FlowPTRClientInterface
-
 
 class SchemaRoute:
     """Route handler for Flow PT schema endpoints."""
 
     base_route: str = "/schema/"
 
-    def __init__(self, client: FlowPTRClientInterface):
+    def __init__(self, client):
         self.client = client
 
     async def get_entity(
