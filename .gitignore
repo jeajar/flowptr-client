@@ -182,3 +182,4 @@ cython_debug/
 
 # Project Specific
 .specs.json
+specs.yaml
