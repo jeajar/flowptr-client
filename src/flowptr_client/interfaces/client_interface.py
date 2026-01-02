@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from typing import Any, Optional
 
 
@@ -7,12 +8,18 @@ class FlowPTRRestAPIClientInterface(ABC):
 
     @abstractmethod
     async def get(
-        self, endpoint: str, params: Optional[dict[str, Any]] = None
+        self, endpoint: str, params: Optional[Mapping[str, Any]] = None
     ) -> dict[str, Any]:
         """Execute GET request."""
 
     @abstractmethod
-    async def post(self, endpoint: str, json: dict[str, Any]) -> dict[str, Any]:
+    async def post(
+        self,
+        endpoint: str,
+        json: dict[str, Any],
+        params: Optional[dict[str, Any]] = None,
+        headers: Optional[dict[str, str]] = None,
+    ) -> dict[str, Any]:
         """Execute POST request."""
 
     @abstractmethod

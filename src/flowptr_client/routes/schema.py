@@ -1,10 +1,12 @@
 from typing import Any, Optional
 
+from .base import BaseRoute
 
-class SchemaRoute:
+
+class SchemaRoute(BaseRoute):
     """Route handler for Flow PT schema endpoints."""
 
-    base_route: str = "/schema/"
+    base_route: str = "/schema"
 
     async def get_entity(
         self, entity_type: str, project_id: Optional[int] = None
